@@ -1,0 +1,54 @@
+# Global settings
+namespace: birdseye
+releaseName: birdseye-release
+
+# Image tags
+images:
+  frontend: myapp/frontend:latest
+  backend: myapp/backend:latest
+  nginx: nginx:alpine
+
+# Ports
+ports:
+  frontend: 8080
+  backend: 8000
+  nginx: 80
+  prometheus: 9090
+  pushgateway: 9091
+  grafana: 3000
+
+# Resource limits
+resources:
+  backend:
+    limits:
+      cpu: "1"
+      memory: 1Gi
+  prometheus:
+    limits:
+      cpu: "0.5"
+      memory: 612Mi
+  grafana:
+    limits:
+      cpu: "0.5"
+      memory: 256Mi
+
+# Domain for ingress
+domain: birdseye.local
+
+
+# Grafana settings
+grafana:
+  adminUser: admin
+  adminPassword: admin123
+  extraEnv:
+    GF_SERVER_ROOT_URL: "%(protocol)s://%(domain)s/grafana"
+    GF_SERVER_SERVE_FROM_SUB_PATH: "true"
+
+# Prometheus settings
+prometheus:
+  extraArgs:
+    - "--web.external-url=http://birdseye.local/prometheus"
+    - "--web.route-prefix=/prometheus"
+
+ingress:
+  enabled: true

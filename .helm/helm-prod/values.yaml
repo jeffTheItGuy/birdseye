@@ -1,0 +1,146 @@
+# =========================================
+#  Global Settings
+# =========================================
+namespace: birdseye
+release: birdseye
+
+# Domain for ingress
+domain: birdseye.local
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+
+#  SSL/TLS
+ssl:
+  enabled: true
+  clusterIssuer: sprout-letsencrypt-prod
+  secretName: sprout-tls-secret
+  email: myemail@gmail.com
+  securityHeaders: false
+
+# ===================================================
+#  Frontend Configuration
+# ===================================================
+frontend:
+  enabled: true 
+  replicaCount: 1
+  image:
+    repository: ghcr.io/USERNAME/birdseye-frontend
+    tag: TAG
+    pullPolicy: Always
+    pullSecrets:
+      - name: ghcr-secret
+  service:
+    port: 8080
+  grafanaUrl: "https://birdseye.nimbusurf.com/grafana"
+  env:
+    nodeEnv: production
+  resources:
+    limits:
+      cpu: "0.5"
+      memory: 512Mi
+    requests:
+      cpu: "0.1"
+      memory: 128Mi
+
+# ===================================================
+#  Backend Configuration
+# ===================================================
+backend:
+  enabled: true  
+  replicaCount: 1
+  image:
+    repository: ghcr.io/USERNAME/birdseye-backend
+    tag: TAG
+    pullPolicy: Always
+    pullSecrets:
+      - name: ghcr-secret
+  service:
+    port: 8000
+  env:
+    PROMETHEUS_GATEWAY_URL: "http://birdseye-pushgateway-svc:9091"
+    ALLOWED_ORIGINS: "https://{{ .Values.domain }},https://www.{{ .Values.domain }}"
+    pythonPath: "/app"
+    pythonUnbuffered: "1"
+    ENV: production
+    MAX_METRICS_PER_REQUEST: "4"
+    REQUESTS_PER_MINUTE: "4"
+  resources:
+    limits:
+      cpu: "1"
+      memory: 1Gi
+    requests:
+      cpu: "0.2"
+      memory: 256Mi
+
+# ===================================================
+#  Prometheus Configuration
+# ===================================================
+
+prometheus:
+  enabled: true 
+  replicaCount: 1
+  image:
+    repository: prom/prometheus
+    tag: latest
+    pullPolicy: Always
+  service:
+    port: 9090
+  resources:
+    limits:
+      cpu: "0.5"
+      memory: 612Mi
+    requests:
+      cpu: "0.1"
+      memory: 256Mi
+
+# ===================================================
+#  Pushgateway Configuration
+# ===================================================
+
+pushgateway:
+  enabled: true  
+  replicaCount: 1
+  image:
+    repository: prom/pushgateway
+    tag: latest
+    pullPolicy: Always
+  service:
+    port: 9091
+  resources:
+    limits:
+      cpu: "0.2"
+      memory: 256Mi
+    requests:
+      cpu: "0.05"
+      memory: 64Mi
+
+# ===================================================
+#  Grafana Configuration
+# ===================================================
+
+grafana:
+  enabled: true 
+  replicaCount: 1
+  image:
+    repository: grafana/grafana
+    tag: latest
+    pullPolicy: IfNotPresent
+  service:
+    port: 3000
+  env:
+    adminUser: admin
+    adminPassword: admin123
+    serverRootUrl: "http://birdseye.nimbusurf.com/grafana"
+    serveFromSubPath: "true"
+    authAnonymousEnabled: "true"
+    authAnonymousOrgRole: "Viewer"
+    authDisableLoginForm: "false"
+  resources:
+    limits:
+      cpu: "0.5"
+      memory: 256Mi
+    requests:
+      cpu: "0.1"
+      memory: 128Mi

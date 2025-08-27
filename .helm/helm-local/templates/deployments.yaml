@@ -1,0 +1,158 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  namespace: {{ .Values.namespace }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: frontend
+  template:
+    metadata:
+      labels:
+        app: frontend
+    spec:
+      containers:
+      - name: frontend
+        image: {{ .Values.images.frontend }}
+        imagePullPolicy: Never
+        ports:
+        - containerPort: {{ .Values.ports.frontend }}
+        env:
+        - name: NODE_ENV
+          value: production
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  namespace: {{ .Values.namespace }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      containers:
+      - name: backend
+        image: {{ .Values.images.backend }}
+        imagePullPolicy: Never
+        ports:
+        - containerPort: {{ .Values.ports.backend }}
+        env:
+        - name: PYTHONPATH
+          value: /app
+        - name: PYTHONUNBUFFERED
+          value: "1"
+        - name: ENV
+          value: production
+        resources:
+          limits:
+            cpu: {{ .Values.resources.backend.limits.cpu }}
+            memory: {{ .Values.resources.backend.limits.memory }}
+          
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prometheus
+  namespace: {{ .Values.namespace }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: prometheus
+  template:
+    metadata:
+      labels:
+        app: prometheus
+    spec:
+      containers:
+      - name: prometheus
+        image: prom/prometheus:latest
+        ports:
+        - containerPort: {{ .Values.ports.prometheus }}
+        args:
+          - "--config.file=/etc/prometheus/prometheus.yml"
+          - "--storage.tsdb.path=/prometheus"
+          - "--web.external-url=http://{{ .Values.domain }}/prometheus"
+          - "--web.route-prefix=/prometheus"
+        volumeMounts:
+        - name: prometheus-config
+          mountPath: /etc/prometheus/prometheus.yml
+          subPath: prometheus.yml
+        - name: prometheus-storage
+          mountPath: /prometheus
+        resources:
+          limits:
+            cpu: {{ .Values.resources.prometheus.limits.cpu }}
+            memory: {{ .Values.resources.prometheus.limits.memory }}
+      volumes:
+      - name: prometheus-config
+        configMap:
+          name: prometheus-config
+      - name: prometheus-storage
+        emptyDir: {}
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pushgateway
+  namespace: {{ .Values.namespace }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: pushgateway
+  template:
+    metadata:
+      labels:
+        app: pushgateway
+    spec:
+      containers:
+      - name: pushgateway
+        image: prom/pushgateway:latest
+        ports:
+        - containerPort: {{ .Values.ports.pushgateway }}
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grafana
+  namespace: {{ .Values.namespace }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: grafana
+  template:
+    metadata:
+      labels:
+        app: grafana
+    spec:
+      containers:
+      - name: grafana
+        image: grafana/grafana:latest
+        ports:
+        - containerPort: {{ .Values.ports.grafana }}
+        env:
+        - name: GF_SECURITY_ADMIN_USER
+          value: {{ .Values.grafana.adminUser }}
+        - name: GF_SECURITY_ADMIN_PASSWORD
+          value: {{ .Values.grafana.adminPassword }}
+        - name: GF_SERVER_ROOT_URL
+          value: "http://{{ .Values.domain }}/grafana"
+        - name: GF_SERVER_SERVE_FROM_SUB_PATH
+          value: "true"
+        resources:
+          limits:
+            cpu: {{ .Values.resources.grafana.limits.cpu }}
+            memory: {{ .Values.resources.grafana.limits.memory }}

@@ -1,0 +1,136 @@
+/* Tailwind directives - required */
+@import "tailwindcss";
+
+/* Global zoom-proof styles */
+* {
+  box-sizing: border-box;
+  scroll-behavior: smooth;
+}
+
+html {
+  width: 100%;
+  overflow-x: hidden;
+  scroll-behavior: smooth !important;
+  scroll-restoration: auto; 
+}
+
+html, body {
+  height: 100%;
+  min-height: 100vh;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  overflow-x: hidden;
+  min-height: 100vh;
+  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  color-scheme: light dark;
+  color: rgba(255, 255, 255, 0.87);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+
+ 
+  background-color: #000000;
+
+
+  
+  background-attachment: fixed;
+}
+
+/* Flexbox layout for sticky footer */
+#root {
+  width: 100%;
+  overflow-x: hidden;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  /* Ensure root doesn't create its own scroll context */
+  overflow-y: visible;
+}
+
+/* Prevent any container from exceeding viewport width */
+.container,
+.max-w-7xl,
+.max-w-6xl,
+.max-w-5xl,
+.max-w-4xl,
+.max-w-3xl,
+.max-w-2xl,
+.max-w-xl,
+.max-w-lg,
+.max-w-md,
+.max-w-sm {
+  max-width: 100% !important;
+}
+
+
+
+@media (max-width: 640px) {
+  /* Shrink text */
+  * {
+    font-size: calc(1em * 0.99) !important;
+  }
+
+  /* Shrink 3d object*/
+  .hero-wrapper {
+    transform: scale(0.7);
+    transform-origin: 80% center;
+  }
+}
+
+@media (max-width: 400px) {
+  /* Shrink text */
+  * {
+    font-size: calc(1em * 0.99) !important;
+  }
+
+  /* Shrink 3d object*/
+  .hero-wrapper {
+    transform: scale(0.7) translateY(-35px);
+    transform-origin: 80% center;
+  }
+}
+
+@media (max-height: 500px) {
+  /* Shrink text */
+  * {
+    font-size: calc(1em * 0.95) !important;
+  }
+
+  /* Shrink 3d object*/
+  .hero-wrapper {
+    transform: scale(0.6) translateY(-80px);
+    transform-origin: 80% center;
+  }
+}
+
+
+
+@keyframes waveFlow {
+  0%, 100% { background-position: 0% 50%; }
+  25% { background-position: 100% 50%; }
+  50% { background-position: 100% 100%; }
+  75% { background-position: 0% 100%; }
+}
+
+
+
+
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+/* For users who prefer reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}

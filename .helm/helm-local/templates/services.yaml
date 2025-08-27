@@ -1,0 +1,76 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend-svc
+  namespace: {{ .Values.namespace }}
+spec:
+  selector:
+    app: frontend
+  ports:
+  - port: 80                # expose port 80 for ingress routing
+    targetPort: {{ .Values.ports.frontend }}  # pod listens here (e.g., 8080)
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend-svc
+  namespace: {{ .Values.namespace }}
+spec:
+  selector:
+    app: backend
+  ports:
+  - port: {{ .Values.ports.backend }}   # expose same port as pod listens on, e.g., 8000
+    targetPort: {{ .Values.ports.backend }}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-svc
+  namespace: {{ .Values.namespace }}
+spec:
+  selector:
+    app: nginx-proxy
+  ports:
+  - port: 80
+    targetPort: {{ .Values.ports.nginx }}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus-svc
+  namespace: {{ .Values.namespace }}
+spec:
+  selector:
+    app: prometheus
+  ports:
+  - port: {{ .Values.ports.prometheus }}
+    targetPort: {{ .Values.ports.prometheus }}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pushgateway-svc
+  namespace: {{ .Values.namespace }}
+spec:
+  selector:
+    app: pushgateway
+  ports:
+  - port: {{ .Values.ports.pushgateway }}
+    targetPort: {{ .Values.ports.pushgateway }}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: grafana-svc
+  namespace: {{ .Values.namespace }}
+spec:
+  selector:
+    app: grafana
+  ports:
+  - port: {{ .Values.ports.grafana }}
+    targetPort: {{ .Values.ports.grafana }}

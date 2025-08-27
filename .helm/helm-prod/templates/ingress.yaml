@@ -1,0 +1,89 @@
+{{- if and (.Values.ingress) (.Values.ingress.enabled) }}
+
+# Ingress for main app with Let's Encrypt SSL
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: birdseye-ingress
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: birdseye
+  annotations:
+     # Attach HTTPS redirect middleware
+    traefik.ingress.kubernetes.io/router.middlewares: {{ .Values.namespace }}-force-https@kubernetescrd,{{ .Values.namespace }}-redirect-www@kubernetescrd
+    # Entry points
+    traefik.ingress.kubernetes.io/router.entrypoints: web,websecure
+    # SSL/TLS certificate
+    cert-manager.io/cluster-issuer: {{ .Values.ssl.clusterIssuer | default "letsencrypt-prod" }}
+spec:
+  ingressClassName: traefik
+  {{- if and .Values.ssl.enabled .Values.domain }}
+  tls:
+  - hosts:
+    - {{ .Values.domain }}
+    - www.{{ .Values.domain }}
+    secretName: {{ .Values.ssl.secretName | default "birdseye-tls-secret" }}
+  {{- end }}
+  rules:
+  - host: {{ .Values.domain | default "localhost" }}
+    http:
+      paths:
+      {{- if .Values.backend.enabled }}
+      - path: /api
+        pathType: Prefix
+        backend:
+          service:
+            name: birdseye-backend-svc
+            port:
+              number: {{ .Values.backend.service.port }}
+      {{- end }}
+      {{- if .Values.frontend.enabled }}
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: birdseye-frontend-svc
+            port:
+              number: 80
+      {{- end }}
+      {{- if .Values.grafana.enabled }}
+      - path: /grafana
+        pathType: Prefix
+        backend:
+          service:
+            name: birdseye-grafana-svc
+            port:
+              number: {{ .Values.grafana.service.port }}
+      {{- end }}
+  - host: www.{{ .Values.domain | default "localhost" }}
+    http:
+      paths:
+      {{- if .Values.backend.enabled }}
+      - path: /api
+        pathType: Prefix
+        backend:
+          service:
+            name: birdseye-backend-svc
+            port:
+              number: {{ .Values.backend.service.port }}
+      {{- end }}
+      {{- if .Values.frontend.enabled }}
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: birdseye-frontend-svc
+            port:
+              number: 80
+      {{- end }}
+      {{- if .Values.grafana.enabled }}
+      - path: /grafana
+        pathType: Prefix
+        backend:
+          service:
+            name: birdseye-grafana-svc
+            port:
+              number: {{ .Values.grafana.service.port }}
+      {{- end }}
+      
+{{- end }}

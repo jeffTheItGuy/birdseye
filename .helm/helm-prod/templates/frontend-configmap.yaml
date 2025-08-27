@@ -1,0 +1,15 @@
+{{- if .Values.frontend.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: birdseye-frontend-config
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: birdseye-frontend
+    release: {{ .Release.Name }}
+data:
+  config.json: |
+    {
+      "GRAFANA_URL": "{{ .Values.frontend.grafanaUrl }}"
+    }
+{{- end }}

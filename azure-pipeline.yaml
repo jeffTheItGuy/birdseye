@@ -1,0 +1,191 @@
+trigger: none
+
+# Variable group containing domain and other configuration variables
+variables:
+- group: k3s-deployment-vars
+
+# Pool configuration for self-hosted agents
+pool:
+  name: Default
+
+stages:
+- stage: Build
+  displayName: "Build Stage"
+  jobs:
+  - job: BuildJob
+    displayName: "Build Application"
+    steps:
+
+    - script: |
+        echo "🔧 Configuring Git user..."
+        git config user.name "$GHCR_USERNAME"
+        git config user.email "$LETSENCRYPT_EMAIL"
+
+        echo "🧹 Setting up GitHub remote..."
+        git remote remove github 2>/dev/null || echo "No existing github remote to remove"
+        git remote add github https://$(GHCR_USERNAME):$(GHCR_TOKEN)@github.com/$(GHCR_USERNAME)/birdseye.git
+
+        echo "🔍 Identifying problematic LFS objects..."
+        git lfs fsck 2>&1 | head -5 || true
+
+        echo "🚀 Creating fresh commit without LFS issues..."
+        # Create a new orphan branch to start clean
+        git checkout --orphan temp-backup
+        
+        # Add all current files (LFS pointers will be added as regular files)
+        git add .
+        
+        # Commit current state
+        git commit -m "Fresh backup from Azure DevOps - $(date)"
+        
+        echo "📤 Pushing fresh backup to GitHub..."
+        git push github temp-backup:main --force
+        
+        echo " Backup completed successfully!"
+        echo " Note: LFS objects were not transferred due to corruption"
+        echo " Code and structure have been backed up successfully"
+      displayName: 'Backup Azure Repo to GitHub (Fresh Start)'
+      env:
+        GHCR: $(GHCR_TOKEN)
+
+    - script: |
+        DATETIME_TAG=$(date +"%Y%m%d-%H%M%S")
+        echo "Generated datetime tag: $DATETIME_TAG"
+
+        COMBINED_TAG="$(Build.BuildId)-$DATETIME_TAG"
+        echo "Combined tag: $COMBINED_TAG"
+
+        echo "##vso[task.setvariable variable=COMBINED_TAG]$COMBINED_TAG"
+        echo "##vso[task.setvariable variable=COMBINED_TAG;isOutput=true]$COMBINED_TAG"
+      name: SetCombinedTag
+      displayName: "Generate DateTime Tag"
+    
+    - script: |
+        echo "Building frontend image..."
+        docker build -f .docker/prod/prodfrontend.Dockerfile -t $(GHCR_REGISTRY)/$(GHCR_USERNAME)/birdseye-frontend:$(COMBINED_TAG) .
+
+        echo "Building backend image..."
+        docker build -f .docker/prod/prodbackend.Dockerfile -t $(GHCR_REGISTRY)/$(GHCR_USERNAME)/birdseye-backend:$(COMBINED_TAG) .
+      displayName: "Build Docker Images"
+    
+    - script: |
+        echo "Logging into GHCR..."
+        echo $(GHCR_TOKEN) | docker login $(GHCR_REGISTRY) -u $(GHCR_USERNAME) --password-stdin
+
+        echo "Pushing frontend image..."
+        docker push $(GHCR_REGISTRY)/$(GHCR_USERNAME)/birdseye-frontend:$(COMBINED_TAG)
+
+        echo "Pushing backend image..."
+        docker push $(GHCR_REGISTRY)/$(GHCR_USERNAME)/birdseye-backend:$(COMBINED_TAG)
+      displayName: "Push Images to GHCR"
+      env:
+        GHCR_TOKEN: $(GHCR_TOKEN)
+    
+    - script: |
+        echo "Build completed successfully"
+        echo "Frontend image: $(GHCR_REGISTRY)/$(GHCR_USERNAME)/birdseye-frontend:$(COMBINED_TAG)"
+        echo "Backend image: $(GHCR_REGISTRY)/$(GHCR_USERNAME)/birdseye-backend:$(COMBINED_TAG)"
+      displayName: "Build Summary"
+
+
+- stage: Deploy
+  displayName: "Deploy Stage"
+  dependsOn: Build
+  condition: succeeded()
+  jobs:
+  - deployment: DeployJob
+    displayName: "Deploy to K3s"
+    environment: "k3s-deployment"
+    variables:
+      - group: k3s-deployment-vars
+      - name: COMBINED_TAG
+        value: $[ stageDependencies.Build.BuildJob.outputs['SetCombinedTag.COMBINED_TAG'] ]
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - task: DownloadSecureFile@1
+            name: kubeconfig
+            displayName: "Download K3s Kubeconfig"
+            inputs:
+              secureFile: "k3s.yml"
+          
+          - script: |
+              echo "Setting up kubeconfig..."
+              export KUBECONFIG=$(Agent.TempDirectory)/k3s.yml
+
+              echo "🔍 Verifying remote cluster access..."
+              kubectl config get-contexts
+              kubectl get nodes
+              kubectl cluster-info
+            displayName: "Setup and Verify Remote Kubeconfig"     
+            
+          - script: |
+              set -e
+
+              export KUBECONFIG=$(Agent.TempDirectory)/k3s.yml
+              
+              echo "Cleaning up any stuck Helm operations..."
+              helm rollback $(RELEASE_NAME) 0 --namespace $(NAMESPACE) 2>/dev/null || echo "No rollback needed"
+              kubectl delete secret -l owner=helm,name=$(RELEASE_NAME) -n $(NAMESPACE) 2>/dev/null || echo "No helm secrets to clean"
+            
+              echo "Creating namespace if it doesn't exist..."
+              kubectl create namespace $(NAMESPACE) --dry-run=client -o yaml | kubectl apply -f -
+              
+              echo "Verifying namespace exists..."
+              kubectl get namespace $(NAMESPACE)
+
+              echo "Creating GHCR secret..."
+              kubectl create secret docker-registry ghcr-secret \
+                --namespace="$NAMESPACE" \
+                --docker-server="$GHCR_REGISTRY" \
+                --docker-username="$GHCR_USERNAME" \
+                --docker-password="$GHCR_TOKEN" \
+                --dry-run=client -o yaml | kubectl apply -f -
+
+              echo "Verifying secret was created..."
+              kubectl get secret ghcr-secret -n "$NAMESPACE"
+            
+              echo "Creating CORS overrides..."
+              cat <<EOF > /tmp/overrides.yaml
+              backend:
+                env:
+                  ALLOWED_ORIGINS: "https://www.${DOMAIN},https://${DOMAIN}"
+              EOF
+              
+              echo "Installing/Upgrading Helm chart..."
+              
+              helm upgrade --install "$RELEASE_NAME" .helm/helm-prod\
+                --namespace "$NAMESPACE" \
+                --set domain="$DOMAIN" \
+                --set imagePullSecretName=ghcr-secret \
+                --set frontend.image.repository="$GHCR_REGISTRY/$GHCR_USERNAME/birdseye-frontend" \
+                --set frontend.image.tag="$COMBINED_TAG" \
+                --set backend.image.repository="$GHCR_REGISTRY/$GHCR_USERNAME/birdseye-backend" \
+                --set backend.image.tag="$COMBINED_TAG" \
+                --set grafana.env.adminUser="$GRAFANA_ADMIN_USER" \
+                --set grafana.env.adminPassword="$GRAFANA_ADMIN_PASSWORD" \
+                --set grafana.env.serverRootUrl="http://$DOMAIN/grafana" \
+                --set ssl.enabled=true \
+                --set ssl.clusterIssuer="$SSL_CLUSTER_ISSUER" \
+                --set ssl.secretName="$SSL_SECRET_NAME" \
+                --set ssl.email="$LETSENCRYPT_EMAIL" \
+                -f /tmp/overrides.yaml \
+                --set backend.resources.limits.cpu="$BACKEND_CPU_LIMIT" \
+                --set backend.resources.limits.memory="$BACKEND_MEMORY_LIMIT" \
+                --set prometheus.resources.limits.cpu="$PROMETHEUS_CPU_LIMIT" \
+                --set prometheus.resources.limits.memory="$PROMETHEUS_MEMORY_LIMIT" \
+                --set grafana.resources.limits.cpu="$GRAFANA_CPU_LIMIT" \
+                --set grafana.resources.limits.memory="$GRAFANA_MEMORY_LIMIT" \
+                --values /tmp/overrides.yaml \
+                --force \
+                --wait \
+                --timeout=300s
+            displayName: "Deploy Application with Helm"
+            env:
+              GHCR_TOKEN: $(GHCR_TOKEN)
+              DOMAIN: $(DOMAIN)
+              GHCR_REGISTRY: $(GHCR_REGISTRY)
+              GRAFANA_ADMIN_USER: $(GRAFANA_ADMIN_USER)
+              GRAFANA_ADMIN_PASSWORD: $(GRAFANA_ADMIN_PASSWORD)
+              LETSENCRYPT_EMAIL: $(LETSENCRYPT_EMAIL)

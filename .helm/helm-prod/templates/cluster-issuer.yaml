@@ -1,0 +1,53 @@
+{{- if .Values.ssl.enabled }}
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: {{ .Values.ssl.clusterIssuer | default "letsencrypt-prod" }}
+  labels:
+    app: {{ .Chart.Name }}
+spec:
+  acme:
+    # The ACME server URL for Let's Encrypt production
+    server: https://acme-v02.api.letsencrypt.org/directory
+    
+    # Email address used for ACME registration
+    email: {{ .Values.ssl.email | required "ssl.email is required when ssl.enabled is true" }}
+    
+    # Name of a secret used to store the ACME account private key
+    privateKeySecretRef:
+      name: {{ .Values.ssl.clusterIssuer | default "birdseye-letsencrypt-prod" }}-private-key
+    
+    # Enable the HTTP-01 challenge provider
+    solvers:
+    - http01:
+        ingress:
+          class: {{ .Values.ingress.ingressClassName | default "traefik" }}
+{{- end }}
+
+{{- if and .Values.ssl.enabled .Values.ssl.staging }}
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: {{ .Values.ssl.clusterIssuer | default "birdseye-letsencrypt-prod" }}-staging
+  labels:
+    app: {{ .Chart.Name }}
+spec:
+  acme:
+    # The ACME server URL for Let's Encrypt staging (for testing)
+    server: https://acme-staging-v02.api.letsencrypt.org/directory
+    
+    # Email address used for ACME registration
+    email: {{ .Values.ssl.email }}
+    
+    # Name of a secret used to store the ACME account private key
+    privateKeySecretRef:
+      name: {{ .Values.ssl.clusterIssuer | default "birdseye-letsencrypt-prod" }}-staging-private-key
+    
+    # Enable the HTTP-01 challenge provider
+    solvers:
+    - http01:
+        ingress:
+          class: {{ .Values.ingress.ingressClassName | default "traefik" }}
+{{- end }}

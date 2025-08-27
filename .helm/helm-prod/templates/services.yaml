@@ -1,0 +1,83 @@
+{{- if .Values.frontend.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: birdseye-frontend-svc
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: birdseye-frontend
+spec:
+  selector:
+    app: birdseye-frontend
+  ports:
+  - port: 80                # expose port 80 for ingress routing
+    targetPort: {{ .Values.frontend.service.port }}  # pod listens here (e.g., 8080)
+{{- end }}
+
+{{- if .Values.backend.enabled }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: birdseye-backend-svc
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: birdseye-backend
+spec:
+  selector:
+    app: birdseye-backend
+  ports:
+  - port: {{ .Values.backend.service.port }}   # expose same port as pod listens on, e.g., 8000
+    targetPort: {{ .Values.backend.service.port }}
+{{- end }}
+
+{{- if .Values.prometheus.enabled }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: birdseye-prometheus-svc
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: birdseye-prometheus
+spec:
+  selector:
+    app: birdseye-prometheus
+  ports:
+  - port: {{ .Values.prometheus.service.port }}
+    targetPort: {{ .Values.prometheus.service.port }}
+{{- end }}
+
+{{- if .Values.pushgateway.enabled }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: birdseye-pushgateway-svc
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: birdseye-pushgateway
+spec:
+  selector:
+    app: birdseye-pushgateway
+  ports:
+  - port: {{ .Values.pushgateway.service.port }}
+    targetPort: {{ .Values.pushgateway.service.port }}
+{{- end }}
+
+{{- if .Values.grafana.enabled }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: birdseye-grafana-svc
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: birdseye-grafana
+spec:
+  selector:
+    app: birdseye-grafana
+  ports:
+  - port: {{ .Values.grafana.service.port }}
+    targetPort: {{ .Values.grafana.service.port }}
+{{- end }}

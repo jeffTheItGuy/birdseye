@@ -1,0 +1,238 @@
+{{- if .Values.frontend.enabled }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: birdseye-frontend
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: birdseye-frontend
+spec:
+  replicas: {{ .Values.frontend.replicaCount }}
+  selector:
+    matchLabels:
+      app: birdseye-frontend
+  template:
+    metadata:
+      labels:
+        app: birdseye-frontend
+      annotations:
+        rollme: {{ randAlphaNum 5 | quote }}
+    spec:
+      {{- if .Values.frontend.image.pullSecrets }}
+      imagePullSecrets:
+        {{- toYaml .Values.frontend.image.pullSecrets | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: frontend
+          image: "{{ .Values.frontend.image.repository }}:{{ .Values.frontend.image.tag }}"
+          imagePullPolicy: {{ .Values.frontend.image.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.frontend.service.port }}
+          env:
+            - name: NODE_ENV
+              value: {{ .Values.frontend.env.nodeEnv | quote }}
+          resources:
+            {{- toYaml .Values.frontend.resources | nindent 12 }}
+          volumeMounts:
+            - name: config-volume
+              mountPath: /usr/share/nginx/html/config.json
+              subPath: config.json
+      volumes:
+        - name: config-volume
+          configMap:
+            name: birdseye-frontend-config
+{{- end }}
+
+
+
+{{- if .Values.backend.enabled }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: birdseye-backend
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: birdseye-backend
+spec:
+  replicas: {{ .Values.backend.replicaCount }}
+  selector:
+    matchLabels:
+      app: birdseye-backend
+  template:
+    metadata:
+      labels:
+        app: birdseye-backend
+      annotations:
+        rollme: {{ randAlphaNum 5 | quote }}
+    spec:
+      {{- if .Values.backend.image.pullSecrets }}
+      imagePullSecrets:
+        {{- toYaml .Values.backend.image.pullSecrets | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: backend
+          image: "{{ .Values.backend.image.repository }}:{{ .Values.backend.image.tag }}"
+          imagePullPolicy: {{ .Values.backend.image.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.backend.service.port }}
+          {{- if .Values.backend.env }}
+          env:
+            {{- if .Values.backend.env.PYTHONPATH }}
+            - name: PYTHONPATH
+              value: {{ .Values.backend.env.PYTHONPATH | quote }}
+            {{- end }}
+            {{- if .Values.backend.env.PYTHONUNBUFFERED }}
+            - name: PYTHONUNBUFFERED
+              value: {{ .Values.backend.env.PYTHONUNBUFFERED | quote }}
+            {{- end }}
+            {{- if .Values.backend.env.ENV }}
+            - name: ENV
+              value: {{ .Values.backend.env.ENV | quote }}
+            {{- end }}
+            {{- if .Values.backend.env.PROMETHEUS_GATEWAY_URL }}
+            - name: PROMETHEUS_GATEWAY_URL
+              value: {{ .Values.backend.env.PROMETHEUS_GATEWAY_URL | quote }}
+            {{- end }}
+            {{- if .Values.backend.env.ALLOWED_ORIGINS }}
+            - name: ALLOWED_ORIGINS
+              value: {{ .Values.backend.env.ALLOWED_ORIGINS | quote }}
+            {{- end }}
+            {{- if .Values.backend.env.REQUESTS_PER_MINUTE }}
+            - name: REQUESTS_PER_MINUTE
+              value: {{ .Values.backend.env.REQUESTS_PER_MINUTE | quote }}
+            {{- end }}
+            {{- if .Values.backend.env.MAX_METRICS_PER_REQUEST }}
+            - name: MAX_METRICS_PER_REQUEST
+              value: {{ .Values.backend.env.MAX_METRICS_PER_REQUEST | quote }}
+            {{- end }}
+          {{- end }}
+          resources:
+{{ toYaml .Values.backend.resources | indent 12 }}
+{{- end }}
+
+{{- if .Values.prometheus.enabled }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: birdseye-prometheus
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: birdseye-prometheus
+spec:
+  replicas: {{ .Values.prometheus.replicaCount }}
+  selector:
+    matchLabels:
+      app: birdseye-prometheus
+  template:
+    metadata:
+      labels:
+        app: birdseye-prometheus
+      annotations:
+        rollme: {{ randAlphaNum 5 | quote }}
+    spec:
+      containers:
+        - name: prometheus
+          image: "{{ .Values.prometheus.image.repository }}:{{ .Values.prometheus.image.tag }}"
+          imagePullPolicy: {{ .Values.prometheus.image.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.prometheus.service.port }}
+          args:
+            - "--config.file=/etc/prometheus/prometheus.yml"
+            - "--storage.tsdb.path=/prometheus"
+            - "--web.external-url=http://{{ .Values.domain }}/prometheus"
+            - "--web.route-prefix=/prometheus"
+          volumeMounts:
+            - name: prometheus-config
+              mountPath: /etc/prometheus/prometheus.yml
+              subPath: prometheus.yml
+            - name: prometheus-storage
+              mountPath: /prometheus
+          resources:
+{{ toYaml .Values.prometheus.resources | indent 12 }}
+      volumes:
+        - name: prometheus-config
+          configMap:
+            name: prometheus-config
+        - name: prometheus-storage
+          emptyDir: {}
+{{- end }}
+
+{{- if .Values.pushgateway.enabled }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: birdseye-pushgateway
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: birdseye-pushgateway
+spec:
+  replicas: {{ .Values.pushgateway.replicaCount }}
+  selector:
+    matchLabels:
+      app: birdseye-pushgateway
+  template:
+    metadata:
+      labels:
+        app: birdseye-pushgateway
+      annotations:
+        rollme: {{ randAlphaNum 5 | quote }}
+    spec:
+      containers:
+        - name: pushgateway
+          image: "{{ .Values.pushgateway.image.repository }}:{{ .Values.pushgateway.image.tag }}"
+          imagePullPolicy: {{ .Values.pushgateway.image.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.pushgateway.service.port }}
+          resources:
+{{ toYaml .Values.pushgateway.resources | indent 12 }}
+{{- end }}
+
+{{- if .Values.grafana.enabled }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: birdseye-grafana
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: birdseye-grafana
+spec:
+  replicas: {{ .Values.grafana.replicaCount }}
+  selector:
+    matchLabels:
+      app: birdseye-grafana
+  template:
+    metadata:
+      labels:
+        app: birdseye-grafana
+      annotations:
+        rollme: {{ randAlphaNum 5 | quote }}
+    spec:
+      containers:
+        - name: grafana
+          image: "{{ .Values.grafana.image.repository }}:{{ .Values.grafana.image.tag }}"
+          imagePullPolicy: {{ .Values.grafana.image.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.grafana.service.port }}
+          env:
+            - name: GF_SECURITY_ADMIN_USER
+              value: {{ .Values.grafana.env.adminUser | quote }}
+            - name: GF_SECURITY_ADMIN_PASSWORD
+              value: {{ .Values.grafana.env.adminPassword | quote }}
+            - name: GF_SERVER_ROOT_URL
+              value: {{ .Values.grafana.env.serverRootUrl | quote }}
+            - name: GF_SERVER_SERVE_FROM_SUB_PATH
+              value: {{ .Values.grafana.env.serveFromSubPath | quote }}
+            - name: GF_AUTH_ANONYMOUS_ENABLED
+              value: {{ .Values.grafana.env.authAnonymousEnabled | quote }}
+            - name: GF_AUTH_ANONYMOUS_ORG_ROLE
+              value: {{ .Values.grafana.env.authAnonymousOrgRole | quote }}
+            - name: GF_AUTH_DISABLE_LOGIN_FORM
+              value: {{ .Values.grafana.env.authDisableLoginForm | quote }}
+          resources:
+{{ toYaml .Values.grafana.resources | indent 12 }}
+{{- end }}

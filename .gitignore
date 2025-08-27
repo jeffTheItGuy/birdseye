@@ -1,0 +1,72 @@
+# ---------------------------
+# React (Vite) Frontend
+# ---------------------------
+**/node_modules/
+**/dist/
+**/.vite/
+**/.eslintcache
+**/.parcel-cache
+**/coverage/
+**/build/
+**/public/hmr/
+
+# Environment files
+.env
+.env.*.local
+*.env.local
+
+# Log files
+*.log
+npm-debug.log*
+
+# ---------------------------
+# Python Backend (FastAPI)
+# ---------------------------
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pyc
+*.pytest_cache/
+*.sqlite3
+*.db
+*.egg-info/
+.venv/
+venv/
+.env
+.env.*
+*.log
+
+# VS Code & dev tools
+.vscode/
+.idea/
+
+# ---------------------------
+# Docker
+# ---------------------------
+*.pid
+*.pid.lock
+docker-compose.override.yml
+docker-compose.*.override.yml
+
+# Local volumes/data
+**/monitoring/prometheus_data/
+**/monitoring/grafana-data/
+**/monitoring/grafana-config/
+**/monitoring/*.db
+
+# SSL/Certs (optional, if generated locally)
+**/nginx/ssl/
+*.crt
+*.key
+
+# ---------------------------
+# General
+# ---------------------------
+.DS_Store
+Thumbs.db
+*.bak
+*.swp
+*.swo
+*.tmp
+*.cache/
